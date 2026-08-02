@@ -24,7 +24,8 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "BuildGraphPlugin"
+rootProject.name = "gradle-build-recorder-project"
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":gradle-build-recorder")
+include(":core")

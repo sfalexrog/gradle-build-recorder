@@ -28,5 +28,6 @@ dependencies {
     implementation(libs.gradle.tooling.api)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.clikt)
+    implementation(projects.core)
     runtimeOnly(libs.slf4j.simple)
 }
