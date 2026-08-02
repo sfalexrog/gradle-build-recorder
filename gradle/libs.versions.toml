@@ -1,0 +1,26 @@
+[versions]
+kotlin = "2.2.0"
+kotlinx-serialization = "1.9.0"
+
+gradle-tooling-api = "9.4.1"
+slf4j = "2.0.18"
+
+clikt = "5.1.0"
+shadow = "9.6.1"
+
+[libraries]
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+
+gradle-tooling-api = { group = "org.gradle", name = "gradle-tooling-api", version.ref = "gradle-tooling-api" }
+slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
+
+clikt = { group = "com.github.ajalt.clikt", name = "clikt", version.ref = "clikt" }
+
+kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
+
+[plugins]
+kotlin-plugin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+
+# Convention plugins (defined in build-logic/convention)
+convention-jvm-module = { id = "com.github.sfalexrog.jvm-module" }
