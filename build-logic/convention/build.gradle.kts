@@ -19,4 +19,6 @@ kotlin {
 
 dependencies {
     implementation(libs.kotlin.gradlePlugin)
+    implementation(libs.detekt.gradlePlugin)
+    implementation(files(libs.javaClass.superclass.protectionDomain.codeSource.location))
 }

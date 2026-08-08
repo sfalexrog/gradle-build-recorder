@@ -2,6 +2,7 @@
 plugins {
     alias(libs.plugins.kotlin.plugin.serialization) apply false
     alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.detekt) apply false
 }
 
 tasks.wrapper {
