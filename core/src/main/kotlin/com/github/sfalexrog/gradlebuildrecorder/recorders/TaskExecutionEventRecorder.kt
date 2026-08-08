@@ -43,8 +43,12 @@ class TaskExecutionEventRecorder: EventRecorder<TaskFinishEvent, TaskExecutionEv
         val descriptor = event.descriptor
         val taskInfo = TaskExecutionEvent(
             taskPath = descriptor.taskPath,
-            originPlugin = try { descriptor.originPlugin?.displayName ?: "unknown/builtin" } catch (ex: UnsupportedMethodException) { "unsupported: $ex" },
-            dependencies = try { descriptor.dependencies.map { it.name } } catch (ex: UnsupportedMethodException) { listOf() },
+            originPlugin = try {
+                descriptor.originPlugin?.displayName ?: "unknown/builtin"
+            } catch (ex: UnsupportedMethodException) { "unsupported: $ex" },
+            dependencies = try {
+                descriptor.dependencies.map { it.name }
+            } catch (_: UnsupportedMethodException) { listOf() },
             event = taskEvent,
         )
         synchronized(this) {

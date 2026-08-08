@@ -14,7 +14,9 @@ class FileDownloadEventRecorder: EventRecorder<FileDownloadFinishEvent, FileDown
         val eventResult = event.result
         val result = when(eventResult) {
             is FileDownloadNotFoundResult -> FileDownloadResult.NotFound
-            is FailureResult -> FileDownloadResult.Failure(messages = eventResult.failures.map { it.message ?: "[no message]" })
+            is FailureResult -> FileDownloadResult.Failure(
+                messages = eventResult.failures.map { it.message ?: "[no message]" }
+            )
             is SuccessResult -> FileDownloadResult.Success
             else -> error("Unexpected result class: ${event.result.javaClass}")
         }

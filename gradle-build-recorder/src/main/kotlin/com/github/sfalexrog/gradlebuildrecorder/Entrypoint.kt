@@ -40,6 +40,7 @@ private class Entrypoint: CliktCommand() {
         .multiple(required = false)
 
     @OptIn(ExperimentalSerializationApi::class)
+    @Suppress("CyclomaticComplexMethod", "TooGenericExceptionCaught", "LongMethod")
     override fun run() {
         val fileDownloadEventRecorder = FileDownloadEventRecorder()
         val taskExecutionEventRecorder = TaskExecutionEventRecorder()
@@ -68,14 +69,20 @@ private class Entrypoint: CliktCommand() {
                     .run()
             }
             GradleBuildResult.Success
-        } catch(ex: Exception) {
+        } catch(ex: RuntimeException) {
             when(ex) {
-                is UnsupportedVersionException -> GradleBuildResult.UnsupportedVersion(ex.message ?: "[no message]")
-                is UnsupportedOperationConfigurationException -> GradleBuildResult.UnsupportedOperationConfiguration(ex.message ?: "[no message]")
-                is UnsupportedBuildArgumentException -> GradleBuildResult.UnsupportedBuildArgument(ex.message ?: "[no message]")
-                is BuildException -> GradleBuildResult.BuildFailure(ex.message ?: "[no message]")
-                is BuildCancelledException -> GradleBuildResult.BuildCancelled(ex.message ?: "[no message]")
-                is GradleConnectionException -> GradleBuildResult.GradleConnectionError(ex.message ?: "[no message]")
+                is UnsupportedVersionException ->
+                    GradleBuildResult.UnsupportedVersion(ex.message ?: "[no message]")
+                is UnsupportedOperationConfigurationException ->
+                    GradleBuildResult.UnsupportedOperationConfiguration(ex.message ?: "[no message]")
+                is UnsupportedBuildArgumentException ->
+                    GradleBuildResult.UnsupportedBuildArgument(ex.message ?: "[no message]")
+                is BuildException ->
+                    GradleBuildResult.BuildFailure(ex.message ?: "[no message]")
+                is BuildCancelledException ->
+                    GradleBuildResult.BuildCancelled(ex.message ?: "[no message]")
+                is GradleConnectionException ->
+                    GradleBuildResult.GradleConnectionError(ex.message ?: "[no message]")
                 else -> throw ex
             }
         }
