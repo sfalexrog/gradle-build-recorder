@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.file
+import com.github.sfalexrog.gradlebuildrecorder.internal.OutputRecorder
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildRecord
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildResult
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleInvocation
@@ -27,6 +28,9 @@ import org.gradle.tooling.events.task.TaskFinishEvent
 import org.gradle.tooling.exceptions.UnsupportedBuildArgumentException
 import org.gradle.tooling.exceptions.UnsupportedOperationConfigurationException
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private class Entrypoint: CliktCommand() {
     val recordPath: File by option("-o", "--output", help = "Output file name")
@@ -57,6 +61,20 @@ private class Entrypoint: CliktCommand() {
                 else -> {}
             }
         }
+        val dateFormat = DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+        val prefixFormatter = { ts: Long ->
+            val instant = Instant.ofEpochMilli(ts).atZone(ZoneId.of("UTC"))
+            val formattedInstant = dateFormat.format(instant)
+            "[$formattedInstant] "
+        }
+        val stdoutRecorder = OutputRecorder(
+            sink = System.out,
+            prefixFormatter = prefixFormatter,
+        )
+        val stderrRecorder = OutputRecorder(
+            sink = System.err,
+            prefixFormatter = prefixFormatter,
+        )
 
         val startTime = System.currentTimeMillis()
         val result: GradleBuildResult = try {
@@ -64,8 +82,8 @@ private class Entrypoint: CliktCommand() {
                 conn.newBuild()
                     .addArguments(gradleArgs)
                     .addProgressListener(taskExecutionListener, setOf(OperationType.TASK, OperationType.FILE_DOWNLOAD))
-                    .setStandardError(System.err)
-                    .setStandardOutput(System.out)
+                    .setStandardError(stderrRecorder)
+                    .setStandardOutput(stdoutRecorder)
                     .run()
             }
             GradleBuildResult.Success
@@ -103,6 +121,8 @@ private class Entrypoint: CliktCommand() {
                 ),
                 fileDownloadEvents = fileDownloadEventRecorder.getRecordedEvents(),
                 taskExecutionEvents = taskExecutionEventRecorder.getRecordedEvents(),
+                stdoutLines = stdoutRecorder.getRecordedLines(),
+                stderrLines = stderrRecorder.getRecordedLines(),
             )
             json.encodeToStream<GradleBuildRecord>(events, output)
         }

@@ -49,4 +49,6 @@ data class GradleBuildRecord(
     val invocation: GradleInvocation,
     val fileDownloadEvents: List<FileDownloadEvent>,
     val taskExecutionEvents: List<TaskExecutionEvent>,
+    val stdoutLines: List<LogLineEvent>,
+    val stderrLines: List<LogLineEvent>,
 )
