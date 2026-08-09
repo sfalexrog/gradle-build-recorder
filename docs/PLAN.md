@@ -14,6 +14,7 @@ This document outlines basic progress w.r.t. different modules/features.
 
 * [x] Basic implementation
   * currently only saves file downloads and task execution events
+  * also saves stdout/stderr messages
 * [ ] `async-profiler` support
 * [ ] Redactions for command-line args
 * [ ] Automated record upload
@@ -23,6 +24,7 @@ This document outlines basic progress w.r.t. different modules/features.
 
 * [x] Basic implementation
   * models for file downloads and task execution
+  * simple model for log files
   * very basic recorders
 * [ ] ???
 
