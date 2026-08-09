@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.plugin.serialization) apply false
     alias(libs.plugins.shadow) apply false
     alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.kotlinx.schema.ksp) apply false
 }
 
 tasks.wrapper {

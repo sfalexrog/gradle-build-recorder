@@ -1,0 +1,402 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildRecord",
+    "type": "object",
+    "properties": {
+        "invocation": {
+            "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.GradleInvocation"
+        },
+        "fileDownloadEvents": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.FileDownloadEvent"
+            }
+        },
+        "taskExecutionEvents": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.TaskExecutionEvent"
+            }
+        },
+        "stdoutLines": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.LogLineEvent"
+            }
+        },
+        "stderrLines": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.LogLineEvent"
+            }
+        }
+    },
+    "additionalProperties": false,
+    "required": [
+        "invocation",
+        "fileDownloadEvents",
+        "taskExecutionEvents",
+        "stdoutLines",
+        "stderrLines"
+    ],
+    "$defs": {
+        "com.github.sfalexrog.gradlebuildrecorder.models.GradleInvocation": {
+            "type": "object",
+            "properties": {
+                "projectPath": {
+                    "type": "string"
+                },
+                "gradleArgs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "result": {
+                    "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildResult"
+                },
+                "startTime": {
+                    "type": "integer"
+                },
+                "endTime": {
+                    "type": "integer"
+                }
+            },
+            "required": [
+                "projectPath",
+                "gradleArgs",
+                "result",
+                "startTime",
+                "endTime"
+            ],
+            "additionalProperties": false
+        },
+        "com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildResult": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/build_cancelled"
+                },
+                {
+                    "$ref": "#/$defs/build_failure"
+                },
+                {
+                    "$ref": "#/$defs/gradle_connection_error"
+                },
+                {
+                    "$ref": "#/$defs/success"
+                },
+                {
+                    "$ref": "#/$defs/unsupported_build_argument"
+                },
+                {
+                    "$ref": "#/$defs/unsupported_gradle_version"
+                },
+                {
+                    "$ref": "#/$defs/unsupported_operation_configuration"
+                }
+            ]
+        },
+        "build_cancelled": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "build_cancelled"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "message"
+            ],
+            "additionalProperties": false
+        },
+        "build_failure": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "build_failure"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "message"
+            ],
+            "additionalProperties": false
+        },
+        "gradle_connection_error": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "gradle_connection_error"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "message"
+            ],
+            "additionalProperties": false
+        },
+        "success": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "success"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "unsupported_build_argument": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "unsupported_build_argument"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "message"
+            ],
+            "additionalProperties": false
+        },
+        "unsupported_gradle_version": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "unsupported_gradle_version"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "message"
+            ],
+            "additionalProperties": false
+        },
+        "unsupported_operation_configuration": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "unsupported_operation_configuration"
+                },
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "message"
+            ],
+            "additionalProperties": false
+        },
+        "com.github.sfalexrog.gradlebuildrecorder.models.FileDownloadEvent": {
+            "type": "object",
+            "properties": {
+                "startTime": {
+                    "type": "integer"
+                },
+                "endTime": {
+                    "type": "integer"
+                },
+                "uri": {
+                    "type": "string"
+                },
+                "bytesDownloaded": {
+                    "type": "integer"
+                },
+                "result": {
+                    "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.FileDownloadResult"
+                }
+            },
+            "required": [
+                "startTime",
+                "endTime",
+                "uri",
+                "bytesDownloaded",
+                "result"
+            ],
+            "additionalProperties": false
+        },
+        "com.github.sfalexrog.gradlebuildrecorder.models.FileDownloadResult": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/failure"
+                },
+                {
+                    "$ref": "#/$defs/not_found"
+                },
+                {
+                    "$ref": "#/$defs/success"
+                }
+            ]
+        },
+        "failure": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "failure"
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "messages"
+            ],
+            "additionalProperties": false
+        },
+        "not_found": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "not_found"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "com.github.sfalexrog.gradlebuildrecorder.models.TaskExecutionEvent": {
+            "type": "object",
+            "properties": {
+                "taskPath": {
+                    "type": "string"
+                },
+                "originPlugin": {
+                    "type": "string"
+                },
+                "dependencies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "event": {
+                    "$ref": "#/$defs/com.github.sfalexrog.gradlebuildrecorder.models.TaskCompletionEvent"
+                }
+            },
+            "required": [
+                "taskPath",
+                "originPlugin",
+                "dependencies",
+                "event"
+            ],
+            "additionalProperties": false
+        },
+        "com.github.sfalexrog.gradlebuildrecorder.models.TaskCompletionEvent": {
+            "oneOf": [
+                {
+                    "$ref": "#/$defs/failed"
+                },
+                {
+                    "$ref": "#/$defs/skipped"
+                },
+                {
+                    "$ref": "#/$defs/success"
+                }
+            ]
+        },
+        "failed": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "failed"
+                },
+                "startTime": {
+                    "type": "integer"
+                },
+                "endTime": {
+                    "type": "integer"
+                },
+                "failures": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "startTime",
+                "endTime",
+                "failures"
+            ],
+            "additionalProperties": false
+        },
+        "skipped": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "const": "skipped"
+                },
+                "startTime": {
+                    "type": "integer"
+                },
+                "endTime": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type",
+                "startTime",
+                "endTime",
+                "reason"
+            ],
+            "additionalProperties": false
+        },
+        "com.github.sfalexrog.gradlebuildrecorder.models.LogLineEvent": {
+            "type": "object",
+            "properties": {
+                "startTime": {
+                    "type": "integer"
+                },
+                "endTime": {
+                    "type": "integer"
+                },
+                "line": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "startTime",
+                "endTime",
+                "line"
+            ],
+            "additionalProperties": false
+        }
+    }
+}

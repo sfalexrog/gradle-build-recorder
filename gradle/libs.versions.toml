@@ -1,6 +1,7 @@
 [versions]
 kotlin = "2.2.0"
 kotlinx-serialization = "1.9.0"
+kotlinx-schema = "0.6.0"
 
 gradle-tooling-api = "9.4.1"
 slf4j = "2.0.18"
@@ -14,6 +15,7 @@ detekt = "2.0.0-alpha.6"
 
 [libraries]
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-schema-generator-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-schema-generator-json", version.ref = "kotlinx-schema" }
 
 gradle-tooling-api = { group = "org.gradle", name = "gradle-tooling-api", version.ref = "gradle-tooling-api" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
@@ -30,6 +32,7 @@ detekt-gradlePlugin = { group = "dev.detekt", name = "dev.detekt.gradle.plugin",
 
 [plugins]
 kotlin-plugin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlinx-schema-ksp = { id = "org.jetbrains.kotlinx.schema.ksp", version.ref = "kotlinx-schema" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 
 # Convention plugins (defined in build-logic/convention)
