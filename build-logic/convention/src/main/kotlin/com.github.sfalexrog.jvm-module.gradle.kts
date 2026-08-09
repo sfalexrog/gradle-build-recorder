@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     kotlin("jvm")
     id("dev.detekt")
+    jacoco
 }
 
 val libs = the<LibrariesForLibs>()
@@ -27,6 +28,10 @@ tasks.withType<Test> {
     testLogging {
         events(TestLogEvent.PASSED, TestLogEvent.FAILED, TestLogEvent.SKIPPED)
     }
+}
+
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
 }
 
 tasks.withType<Detekt>().configureEach {
