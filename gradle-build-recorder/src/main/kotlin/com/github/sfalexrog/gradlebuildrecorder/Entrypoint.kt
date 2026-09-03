@@ -6,8 +6,10 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.sfalexrog.gradlebuildrecorder.internal.OutputRecorder
+import com.github.sfalexrog.gradlebuildrecorder.internal.extractAsyncProfiler
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildRecord
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildResult
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleInvocation
@@ -16,8 +18,10 @@ import com.github.sfalexrog.gradlebuildrecorder.recorders.TaskExecutionEventReco
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToStream
+import one.profiler.AsyncProfiler
 import org.gradle.tooling.BuildCancelledException
 import org.gradle.tooling.BuildException
+import org.gradle.tooling.ConfigurableLauncher
 import org.gradle.tooling.GradleConnectionException
 import org.gradle.tooling.GradleConnector
 import org.gradle.tooling.UnsupportedVersionException
@@ -31,19 +35,51 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+
 
 private class Entrypoint: CliktCommand() {
+    private val execTimestamp = System.currentTimeMillis()
+
     val recordPath: File by option("-o", "--output", help = "Output file name")
         .file(canBeFile = true, canBeDir = false, mustExist = false)
-        .default(File("build_log_${System.currentTimeMillis()}.json"))
+        .default(File("build_log_$execTimestamp.json"))
 
-    val gradleProjectPath: File by argument(name = "gradleProjectPath", help = "Path to Gradle project")
+    val gradleProjectPath: File by argument(name = "gradle-project-path", help = "Path to Gradle project")
         .file(mustExist = true)
 
     val gradleArgs by argument(name = "Gradle execution arguments")
         .multiple(required = false)
 
-    @OptIn(ExperimentalSerializationApi::class)
+    val profilerEnabled by option("-p", "--with-profiler", help = "Run build with async-profiler enabled")
+        .boolean()
+        .default(false)
+
+    val profilePath: File by option("--profiler-output", help = "Profile output file name")
+        .file(canBeFile = true, canBeDir = false, mustExist = false)
+        .default(File("profile_${execTimestamp}_%p.jfr"))
+
+    val profilerArgs by option("--profiler-args", help = "Profiler arguments (other than file=)")
+        .default("jfr,all")
+
+    private fun ConfigurableLauncher<*>.addProfiler() {
+        val asprofLib = extractAsyncProfiler()
+        if (asprofLib == null) {
+            println("failed to extract async profiler")
+            return
+        }
+        println("Profiler extracted to ${asprofLib.absolutePath}")
+        asprofLib.deleteOnExit()
+        val profilerOutputPath = profilePath.absolutePath
+        println("Saving profile output to $profilerOutputPath, args $profilerArgs")
+        val agentLine = "-agentpath:${asprofLib.absolutePath}=start,file=$profilerOutputPath,$profilerArgs"
+        addJvmArguments(agentLine)
+        addArguments("-Dkotlin.daemon.jvmargs=\"$agentLine \" -Dfile.encoding=UTF-8 -XX:+UseG1GC -XX:SoftRefLRUPolicyMSPerMB=1 -XX:ReservedCodeCacheSize=320m -XX:+HeapDumpOnOutOfMemoryError -Xmx4g -Xms4g")
+        // We don't want the daemon to stick around
+        addArguments("-Dorg.gradle.daemon=false")
+    }
+
+    @OptIn(ExperimentalSerializationApi::class, ExperimentalAtomicApi::class)
     @Suppress("CyclomaticComplexMethod", "TooGenericExceptionCaught", "LongMethod")
     override fun run() {
         val fileDownloadEventRecorder = FileDownloadEventRecorder()
@@ -77,22 +113,36 @@ private class Entrypoint: CliktCommand() {
         )
 
         val startTime = System.currentTimeMillis()
+
         val result: GradleBuildResult = try {
+//            val daemonPid = AtomicReference<Long>(-1)
             connection.use { conn ->
-                conn.newBuild()
+//                val executer = conn.action().projectsLoaded(
+//                    { ProcessHandle.current().pid() }
+//                ) { pid ->
+//                    daemonPid.store(pid)
+//                }.build()
+//                conn.newBuild()
+                val launcher = //executer
+                    conn.newBuild()
                     .addArguments(gradleArgs)
                     .addProgressListener(taskExecutionListener, setOf(OperationType.TASK, OperationType.FILE_DOWNLOAD))
                     .setStandardError(stderrRecorder)
                     .setStandardOutput(stdoutRecorder)
-                    .run()
+                if (profilerEnabled) {
+                    launcher.addProfiler()
+                }
+                launcher.run()
+//                println("Daemon PID was ${daemonPid}, my PID is ${ProcessHandle.current().pid()}")
+//                AsyncProfiler.getInstance().execute("stop")
             }
             GradleBuildResult.Success
         } catch(ex: RuntimeException) {
             when(ex) {
-                is UnsupportedVersionException ->
-                    GradleBuildResult.UnsupportedVersion(ex.message ?: "[no message]")
                 is UnsupportedOperationConfigurationException ->
                     GradleBuildResult.UnsupportedOperationConfiguration(ex.message ?: "[no message]")
+                is UnsupportedVersionException ->
+                    GradleBuildResult.UnsupportedVersion(ex.message ?: "[no message]")
                 is UnsupportedBuildArgumentException ->
                     GradleBuildResult.UnsupportedBuildArgument(ex.message ?: "[no message]")
                 is BuildException ->
@@ -125,6 +175,23 @@ private class Entrypoint: CliktCommand() {
                 stderrLines = stderrRecorder.getRecordedLines(),
             )
             json.encodeToStream<GradleBuildRecord>(events, output)
+        }
+        if (result == GradleBuildResult.Success) {
+            return
+        }
+        when(result) {
+            is GradleBuildResult.BuildFailure ->
+                error("Build failed: ${result.message}")
+            is GradleBuildResult.BuildCancelled ->
+                error("Build cancelled: ${result.message}")
+            is GradleBuildResult.UnsupportedVersion ->
+                error("Unsupported Gradle version: ${result.message}")
+            is GradleBuildResult.UnsupportedOperationConfiguration ->
+                error("Unsupported configuration: ${result.message}")
+            is GradleBuildResult.GradleConnectionError ->
+                error("Gradle connection error: ${result.message}")
+            is GradleBuildResult.UnsupportedBuildArgument ->
+                error("Unsupported build argument: ${result.message}")
         }
     }
 }
