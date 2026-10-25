@@ -18,6 +18,31 @@ Open it directly with a browser, including offline. Node must satisfy `package.j
 From the repository root, `./gradlew :web-viewer:build` installs locked npm dependencies,
 checks the viewer, and builds the same HTML. `./gradlew assemble` includes the viewer.
 
+## Embedding from Kotlin
+
+The `web-viewer` project also builds a JVM library. `packageWebViewer` copies the built
+single HTML file into generated resources; `processResources`, `jar`, and consumers
+of the project dependency build it automatically. The recorder depends on this library,
+so its application distribution and shadow JAR include the viewer.
+
+```kotlin
+import com.github.sfalexrog.gradlebuildrecorder.viewer.RecordingHtml
+
+val html = RecordingHtml.render(recordingJson)
+outputFile.writeText(html, Charsets.UTF_8)
+```
+
+Pass the serialized recording JSON directly. `RecordingHtml.render()` returns the
+empty viewer. The HTML contains `<script id="gbr-recording" type="application/json">""</script>`;
+the API replaces this default with an HTML-safe JSON string. The viewer validates
+and opens it at startup. Opening or dropping another JSON file still works, including
+after an invalid embedded recording. The CLI writes this HTML when its output file
+has a `.html` extension; other extensions produce JSON.
+
+With a recording open, **Export JSON** downloads its original JSON, including all
+events and logs regardless of the current filters. Embedded recordings download as
+`recording.json`; opened JSON files retain their filename.
+
 ## Exploring a recording
 
 Open or drop a recorder JSON file. Projects have fixed left-aligned labels; hovering a

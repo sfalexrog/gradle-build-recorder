@@ -1,5 +1,9 @@
 plugins {
-    base
+    alias(libs.plugins.convention.jvm.module)
+}
+
+dependencies {
+    implementation(libs.kotlinx.serialization.json)
 }
 
 // Exec tasks use only declared paths/providers so the build supports configuration-cache reuse.
@@ -28,5 +32,14 @@ val testWebViewer by tasks.registering(Exec::class) {
     workingDir(viewerDirectory)
     commandLine("npm", "run", "test:unit", "--", "--run")
 }
-tasks.assemble { dependsOn(buildWebViewer) }
+val packageWebViewer by tasks.registering(Sync::class) {
+    description = "Package the standalone HTML viewer as a JVM resource"
+    from(buildWebViewer) { include("index.html") }
+    into(layout.buildDirectory.dir("generated/resources/web-viewer"))
+    rename("index.html", "recording-viewer.html")
+}
+sourceSets.main {
+    resources.srcDir(packageWebViewer)
+}
+
 tasks.check { dependsOn(testWebViewer) }

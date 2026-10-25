@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef } from 'vue'
+import { computed, onMounted, ref, shallowRef } from 'vue'
 import {
   bounds,
   clampView,
@@ -19,6 +19,8 @@ import BuildTimeline from './components/timeline/BuildTimeline.vue'
 import DownloadInspector from './components/DownloadInspector.vue'
 
 const recording = shallowRef<GradleBuildRecord | null>(null)
+// Keep the original JSON so export preserves every field and is independent of UI filters.
+const recordingJson = shallowRef('')
 const filename = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -127,24 +129,53 @@ async function load(file?: File) {
   loading.value = true
   error.value = ''
   try {
-    const parsed = parseRecording(await file.text())
-    recording.value = parsed
-    filename.value = file.name
-    view.value = bounds(parsed)
-    selection.value = null
-    cursor.value = null
-    pinnedTime.value = null
-    selectedProject.value = null
-    selectedTask.value = null
-    selectedDownload.value = null
-    inspector.value = 'tasks'
-    logLimit.value = 300
-    search.value = ''
+    loadRecording(await file.text(), file.name)
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Could not read the recording.'
   } finally {
     loading.value = false
     if (fileInput.value) fileInput.value.value = ''
+  }
+}
+function loadRecording(json: string, name: string) {
+  const parsed = parseRecording(json)
+  recordingJson.value = json
+  recording.value = parsed
+  filename.value = name
+  view.value = bounds(parsed)
+  selection.value = null
+  cursor.value = null
+  pinnedTime.value = null
+  selectedProject.value = null
+  selectedTask.value = null
+  selectedDownload.value = null
+  inspector.value = 'tasks'
+  logLimit.value = 300
+  search.value = ''
+}
+onMounted(() => {
+  try {
+    // The HTML resource holds a JSON string; an empty string means no embedded recording.
+    const json: unknown = JSON.parse(document.getElementById('gbr-recording')?.textContent || '""')
+    if (typeof json !== 'string') throw new Error('Embedded recording must be a JSON string.')
+    if (json !== '') loadRecording(json, 'Embedded recording')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Could not read the embedded recording.'
+  }
+})
+function exportJson() {
+  if (!recording.value) return
+  const url = URL.createObjectURL(new Blob([recordingJson.value], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = /\.json$/i.test(filename.value) ? filename.value : 'recording.json'
+  document.body.append(link)
+  try {
+    link.click()
+  } finally {
+    link.remove()
+    // Let the browser start the download before releasing its backing data.
+    setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 }
 function zoom(factor: number, anchor = (view.value.start + view.value.end) / 2) {
@@ -167,13 +198,16 @@ function fit() {
         <span class="brand-icon">▥</span>
         <div><strong>Build Recorder</strong><span>GRADLE TIMELINE EXPLORER</span></div>
       </div>
-      <label class="button primary"
-        ><span>↥</span> Open recording<input
-          ref="fileInput"
-          type="file"
-          accept=".json,application/json"
-          @change="load(($event.target as HTMLInputElement).files?.[0])"
-      /></label>
+      <div class="header-actions">
+        <button v-if="recording" @click="exportJson">Export JSON</button>
+        <label class="button primary"
+          ><span>↥</span> Open recording<input
+            ref="fileInput"
+            type="file"
+            accept=".json,application/json"
+            @change="load(($event.target as HTMLInputElement).files?.[0])"
+        /></label>
+      </div>
     </header>
     <div v-if="error" role="alert" class="error">{{ error }}</div>
     <section v-if="!recording" class="empty-state">

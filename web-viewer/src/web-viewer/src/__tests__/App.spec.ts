@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '../App.vue'
 import { fixture } from './fixtures'
@@ -15,6 +15,119 @@ async function loaded(record = fixture) {
   return wrapper
 }
 describe('viewer', () => {
+  afterEach(() => {
+    document.getElementById('gbr-recording')?.remove()
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  function captureDownload() {
+    vi.useFakeTimers()
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:recording')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    return { createObjectURL, revokeObjectURL, click }
+  }
+
+  async function downloadedText(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(blob)
+    })
+  }
+
+  it('exports the original embedded JSON regardless of filters and releases the download URL', async () => {
+    const record = structuredClone(fixture)
+    record.stdoutLines[0]!.line = '</script> \\" Հայերեն 😀\n'
+    const json = JSON.stringify(record, null, 2)
+    embed(json)
+    const wrapper = mount(App)
+    await flushPromises()
+    await wrapper.get('input[type=search]').setValue('no matching logs')
+    const { createObjectURL, revokeObjectURL, click } = captureDownload()
+    await wrapper.get('.header-actions button').trigger('click')
+    expect(click).toHaveBeenCalledOnce()
+    const link = click.mock.instances[0] as HTMLAnchorElement
+    expect(link.download).toBe('recording.json')
+    expect(link.href).toBe('blob:recording')
+    expect(link.isConnected).toBe(false)
+    const blob = createObjectURL.mock.calls[0]![0]
+    expect(blob.type).toBe('application/json')
+    expect(revokeObjectURL).not.toHaveBeenCalled()
+    vi.runAllTimers()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:recording')
+    vi.useRealTimers()
+    expect(await downloadedText(blob)).toBe(json)
+    wrapper.unmount()
+  })
+
+  it('exports the currently opened file after replacing an embedded recording', async () => {
+    embed(JSON.stringify(fixture))
+    const record = structuredClone(fixture)
+    record.stdoutLines[0]!.line = 'replacement recording'
+    const wrapper = await loaded(record)
+    const { createObjectURL, click } = captureDownload()
+    await wrapper.get('.header-actions button').trigger('click')
+    expect((click.mock.instances[0] as HTMLAnchorElement).download).toBe('build.json')
+    const blob = createObjectURL.mock.calls[0]![0]
+    vi.runAllTimers()
+    vi.useRealTimers()
+    expect(await downloadedText(blob)).toBe(JSON.stringify(record))
+    wrapper.unmount()
+  })
+
+  function embed(json: string) {
+    const slot = document.createElement('script')
+    slot.id = 'gbr-recording'
+    slot.type = 'application/json'
+    slot.textContent = JSON.stringify(json)
+    document.body.append(slot)
+  }
+
+  it('starts with the file picker when the embedded string is empty', () => {
+    embed('')
+    const wrapper = mount(App)
+    expect(wrapper.find('.empty-state').exists()).toBe(true)
+    expect(wrapper.find('.header-actions button').exists()).toBe(false)
+    expect(wrapper.find('[role=alert]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('loads embedded recordings on startup and allows opening another file', async () => {
+    const record = structuredClone(fixture)
+    record.stdoutLines[0]!.line = '</script><script>alert("hello")</script> Հայերեն 😀'
+    embed(JSON.stringify(record))
+    const wrapper = mount(App)
+    await flushPromises()
+    expect(wrapper.findAll('.task-list article')).toHaveLength(2)
+    expect(wrapper.get('.subtitle').text()).toContain('Embedded recording')
+    expect(wrapper.get('.log-lines').text()).toContain(record.stdoutLines[0]!.line)
+    expect(wrapper.find('.log-lines script').exists()).toBe(false)
+    const input = wrapper.get('input[type=file]')
+    Object.defineProperty(input.element, 'files', {
+      value: [{ name: 'another.json', text: async () => JSON.stringify(fixture) }],
+    })
+    await input.trigger('change')
+    await flushPromises()
+    expect(wrapper.get('.subtitle').text()).toContain('another.json')
+    expect(wrapper.get('.log-lines').text()).toContain('hello')
+    wrapper.unmount()
+  })
+
+  it.each(['{}', 'invalid JSON'])('reports invalid embedded recordings: %s', async (json) => {
+    embed(json)
+    const wrapper = mount(App)
+    await flushPromises()
+    expect(wrapper.find('[role=alert]').exists()).toBe(true)
+    expect(wrapper.find('.empty-state').exists()).toBe(true)
+    expect(wrapper.find('input[type=file]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('starts with an accessible local-file picker', () => {
     const wrapper = mount(App)
     expect(wrapper.text()).toContain('Open a build recording')
