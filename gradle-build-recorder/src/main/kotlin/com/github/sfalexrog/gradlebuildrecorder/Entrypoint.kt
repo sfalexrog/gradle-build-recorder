@@ -5,11 +5,12 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.arguments.multiple
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.sfalexrog.gradlebuildrecorder.internal.OutputRecorder
-import com.github.sfalexrog.gradlebuildrecorder.internal.extractAsyncProfiler
+import com.github.sfalexrog.gradlebuildrecorder.internal.ProfilerSession
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildRecord
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildResult
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleInvocation
@@ -18,10 +19,8 @@ import com.github.sfalexrog.gradlebuildrecorder.recorders.TaskExecutionEventReco
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToStream
-import one.profiler.AsyncProfiler
 import org.gradle.tooling.BuildCancelledException
 import org.gradle.tooling.BuildException
-import org.gradle.tooling.ConfigurableLauncher
 import org.gradle.tooling.GradleConnectionException
 import org.gradle.tooling.GradleConnector
 import org.gradle.tooling.UnsupportedVersionException
@@ -35,7 +34,6 @@ import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 
 private class Entrypoint: CliktCommand() {
@@ -62,30 +60,25 @@ private class Entrypoint: CliktCommand() {
     val profilerArgs by option("--profiler-args", help = "Profiler arguments (other than file=)")
         .default("jfr,all")
 
-    private fun ConfigurableLauncher<*>.addProfiler() {
-        val asprofLib = extractAsyncProfiler()
-        if (asprofLib == null) {
-            println("failed to extract async profiler")
-            return
-        }
-        println("Profiler extracted to ${asprofLib.absolutePath}")
-        asprofLib.deleteOnExit()
-        val profilerOutputPath = profilePath.absolutePath
-        println("Saving profile output to $profilerOutputPath, args $profilerArgs")
-        val agentLine = "-agentpath:${asprofLib.absolutePath}=start,file=$profilerOutputPath,$profilerArgs"
-        addJvmArguments(agentLine)
-        addArguments("-Dkotlin.daemon.jvmargs=\"$agentLine \" -Dfile.encoding=UTF-8 -XX:+UseG1GC -XX:SoftRefLRUPolicyMSPerMB=1 -XX:ReservedCodeCacheSize=320m -XX:+HeapDumpOnOutOfMemoryError -Xmx4g -Xms4g")
-        // We don't want the daemon to stick around
-        addArguments("-Dorg.gradle.daemon=false")
-    }
+    val noDaemon by option("--no-daemon", help = "Use a fresh daemon and stop it after the build")
+        .flag()
 
-    @OptIn(ExperimentalSerializationApi::class, ExperimentalAtomicApi::class)
+    @OptIn(ExperimentalSerializationApi::class)
     @Suppress("CyclomaticComplexMethod", "TooGenericExceptionCaught", "LongMethod")
     override fun run() {
         val fileDownloadEventRecorder = FileDownloadEventRecorder()
         val taskExecutionEventRecorder = TaskExecutionEventRecorder()
 
-        val connection = GradleConnector.newConnector()
+        val profiler = if (profilerEnabled) ProfilerSession(profilePath, profilerArgs) else null
+        val singleUse = noDaemon || gradleArgs.lastOrNull {
+            it == "--no-daemon" || it == "--daemon" || it.startsWith("-Dorg.gradle.daemon=")
+        }?.let { it == "--no-daemon" || it == "-Dorg.gradle.daemon=false" } == true
+        val buildArgs = gradleArgs.filterNot {
+            it == "--no-daemon" || it == "--daemon" || it.startsWith("-Dorg.gradle.daemon=")
+        }
+        val connector = GradleConnector.newConnector()
+        if (singleUse) ProfilerSession.isolateDaemon(connector)
+        val connection = connector
             .forProjectDirectory(gradleProjectPath)
             .connect()
 
@@ -115,26 +108,14 @@ private class Entrypoint: CliktCommand() {
         val startTime = System.currentTimeMillis()
 
         val result: GradleBuildResult = try {
-//            val daemonPid = AtomicReference<Long>(-1)
             connection.use { conn ->
-//                val executer = conn.action().projectsLoaded(
-//                    { ProcessHandle.current().pid() }
-//                ) { pid ->
-//                    daemonPid.store(pid)
-//                }.build()
-//                conn.newBuild()
-                val launcher = //executer
-                    conn.newBuild()
-                    .addArguments(gradleArgs)
+                val launcher = conn.newBuild()
                     .addProgressListener(taskExecutionListener, setOf(OperationType.TASK, OperationType.FILE_DOWNLOAD))
                     .setStandardError(stderrRecorder)
                     .setStandardOutput(stdoutRecorder)
-                if (profilerEnabled) {
-                    launcher.addProfiler()
-                }
+                profiler?.configure(launcher)
+                launcher.addArguments(buildArgs)
                 launcher.run()
-//                println("Daemon PID was ${daemonPid}, my PID is ${ProcessHandle.current().pid()}")
-//                AsyncProfiler.getInstance().execute("stop")
             }
             GradleBuildResult.Success
         } catch(ex: RuntimeException) {
@@ -153,6 +134,8 @@ private class Entrypoint: CliktCommand() {
                     GradleBuildResult.GradleConnectionError(ex.message ?: "[no message]")
                 else -> throw ex
             }
+        } finally {
+            if (singleUse) ProfilerSession.stopIsolatedDaemon()
         }
         val endTime = System.currentTimeMillis()
 

@@ -38,6 +38,7 @@ internal class OutputRecorder(
 
     override fun flush() {
         processPreFlushBuffer()
+        sink.flush()
         super.flush()
     }
 

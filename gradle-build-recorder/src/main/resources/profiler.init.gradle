@@ -1,0 +1,82 @@
+import one.profiler.AsyncProfiler
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.lang.management.ManagementFactory
+import org.gradle.internal.operations.BuildOperationDescriptor
+import org.gradle.internal.operations.BuildOperationListener
+import org.gradle.internal.operations.BuildOperationListenerManager
+import org.gradle.internal.operations.OperationFinishEvent
+import org.gradle.internal.operations.OperationIdentifier
+import org.gradle.internal.operations.OperationProgressEvent
+import org.gradle.internal.operations.OperationStartEvent
+import org.gradle.launcher.exec.RunBuildBuildOperationType
+
+initscript {
+    dependencies { classpath files('@PROFILER_API@') }
+}
+
+/**
+ * The global operation listener survives between builds, including configuration-cache hits
+ * where init scripts are skipped. Only root build operations control the process-wide profiler;
+ * buildSrc and included builds must not stop their parent's recording.
+ *
+ * These are internal Gradle APIs: keep compatibility tests when upgrading the Tooling API.
+ */
+class RecorderProfilerListener implements BuildOperationListener {
+    private final AsyncProfiler profiler = AsyncProfiler.getInstance()
+    private String output
+    private static final String STAGING = '@STAGING@'
+
+    // Per-invocation control data is deliberately read outside Gradle's configuration
+    // input tracking. It belongs to this daemon listener, never to the cached task graph.
+    private static String invocationProperty(String name) {
+        ManagementFactory.runtimeMXBean.systemProperties.get(name)
+    }
+
+    static void install(BuildOperationListenerManager manager) {
+        def listener = new RecorderProfilerListener()
+        // Reconfiguration can create a new script classloader. Replace the old listener
+        // by logical identity rather than retaining one listener per classloader/build.
+        manager.removeListener(listener)
+        listener.output = invocationProperty('gbr.profiler.output')
+        manager.addListener(listener)
+        if (listener.output != null && listener.profiler.execute('status').startsWith('Profiler is not active')) {
+            listener.profiler.execute('start,' + invocationProperty('gbr.profiler.args') + ',file=' + STAGING)
+        }
+    }
+
+    @Override
+    boolean equals(Object other) {
+        other != null && other.class.name == getClass().name
+    }
+
+    @Override
+    int hashCode() { getClass().name.hashCode() }
+
+    @Override
+    void started(BuildOperationDescriptor operation, OperationStartEvent event) {
+        if (operation.details instanceof RunBuildBuildOperationType.Details) {
+            output = invocationProperty('gbr.profiler.output')
+            if (output != null) {
+                profiler.execute('start,' + invocationProperty('gbr.profiler.args') + ',file=' + STAGING)
+            }
+        }
+    }
+
+    @Override
+    void finished(BuildOperationDescriptor operation, OperationFinishEvent event) {
+        if (operation.details instanceof RunBuildBuildOperationType.Details && output != null) {
+            def destination = output
+            output = null
+            profiler.execute('stop')
+            def pid = Long.toString(ProcessHandle.current().pid())
+            Files.move(new File(STAGING.replace('%p', pid)).toPath(),
+                new File(destination.replace('%p', pid)).toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
+    @Override
+    void progress(OperationIdentifier operation, OperationProgressEvent event) {}
+}
+
+RecorderProfilerListener.install(gradle.services.get(BuildOperationListenerManager))

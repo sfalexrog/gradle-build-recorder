@@ -39,3 +39,11 @@ dependencies {
     implementation(libs.async.profiler)
     runtimeOnly(libs.slf4j.simple)
 }
+
+// Integration fixtures use this installation rather than downloading another Gradle distribution.
+tasks.test {
+    systemProperty("test.gradle.home", gradle.gradleHomeDir!!.absolutePath)
+    dependsOn(tasks.shadowJar)
+    systemProperty("test.recorder.jar", tasks.shadowJar.flatMap { it.archiveFile }.get().asFile.absolutePath)
+    systemProperty("test.wrapper.properties", rootProject.file("gradle/wrapper/gradle-wrapper.properties").absolutePath)
+}
