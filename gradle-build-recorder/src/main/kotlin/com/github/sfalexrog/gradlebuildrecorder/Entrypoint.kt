@@ -11,14 +11,12 @@ import com.github.ajalt.clikt.parameters.types.boolean
 import com.github.ajalt.clikt.parameters.types.file
 import com.github.sfalexrog.gradlebuildrecorder.internal.OutputRecorder
 import com.github.sfalexrog.gradlebuildrecorder.internal.ProfilerSession
+import com.github.sfalexrog.gradlebuildrecorder.internal.writeRecording
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildRecord
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleBuildResult
 import com.github.sfalexrog.gradlebuildrecorder.models.GradleInvocation
 import com.github.sfalexrog.gradlebuildrecorder.recorders.FileDownloadEventRecorder
 import com.github.sfalexrog.gradlebuildrecorder.recorders.TaskExecutionEventRecorder
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToStream
 import org.gradle.tooling.BuildCancelledException
 import org.gradle.tooling.BuildException
 import org.gradle.tooling.GradleConnectionException
@@ -39,7 +37,9 @@ import java.time.format.DateTimeFormatter
 private class Entrypoint: CliktCommand() {
     private val execTimestamp = System.currentTimeMillis()
 
-    val recordPath: File by option("-o", "--output", help = "Output file name")
+    val recordPath: File by option(
+        "-o", "--output", help = "Output file name (.html embeds the viewer; otherwise JSON)",
+    )
         .file(canBeFile = true, canBeDir = false, mustExist = false)
         .default(File("build_log_$execTimestamp.json"))
 
@@ -63,7 +63,6 @@ private class Entrypoint: CliktCommand() {
     val noDaemon by option("--no-daemon", help = "Use a fresh daemon and stop it after the build")
         .flag()
 
-    @OptIn(ExperimentalSerializationApi::class)
     @Suppress("CyclomaticComplexMethod", "TooGenericExceptionCaught", "LongMethod")
     override fun run() {
         val fileDownloadEventRecorder = FileDownloadEventRecorder()
@@ -139,26 +138,20 @@ private class Entrypoint: CliktCommand() {
         }
         val endTime = System.currentTimeMillis()
 
-        recordPath.outputStream().use { output ->
-            val json = Json {
-                prettyPrint = true
-                prettyPrintIndent = "  "
-            }
-            val events = GradleBuildRecord(
-                invocation = GradleInvocation(
-                    projectPath = gradleProjectPath.absolutePath,
-                    gradleArgs = gradleArgs,
-                    result = result,
-                    startTime = startTime,
-                    endTime = endTime,
-                ),
-                fileDownloadEvents = fileDownloadEventRecorder.getRecordedEvents(),
-                taskExecutionEvents = taskExecutionEventRecorder.getRecordedEvents(),
-                stdoutLines = stdoutRecorder.getRecordedLines(),
-                stderrLines = stderrRecorder.getRecordedLines(),
-            )
-            json.encodeToStream<GradleBuildRecord>(events, output)
-        }
+        val events = GradleBuildRecord(
+            invocation = GradleInvocation(
+                projectPath = gradleProjectPath.absolutePath,
+                gradleArgs = gradleArgs,
+                result = result,
+                startTime = startTime,
+                endTime = endTime,
+            ),
+            fileDownloadEvents = fileDownloadEventRecorder.getRecordedEvents(),
+            taskExecutionEvents = taskExecutionEventRecorder.getRecordedEvents(),
+            stdoutLines = stdoutRecorder.getRecordedLines(),
+            stderrLines = stderrRecorder.getRecordedLines(),
+        )
+        writeRecording(recordPath, events)
         if (result == GradleBuildResult.Success) {
             return
         }

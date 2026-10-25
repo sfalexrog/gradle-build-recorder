@@ -36,6 +36,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.clikt)
     implementation(projects.core)
+    implementation(projects.webViewer)
     implementation(libs.async.profiler)
     runtimeOnly(libs.slf4j.simple)
 }

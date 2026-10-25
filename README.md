@@ -36,6 +36,11 @@ This will execute a build in `$HOME/AndroidStudioProjects/nowinandroid`, passing
 
 If you don't specify output file name, the name will be generated automatically using the pattern `build_log_${System.currentTimeMillis()}.json`, and the file will be saved in the current directory.
 
+Use `-o build-recording.html` to save a standalone HTML viewer with the recording
+embedded (the extension check ignores case). Open it in a browser, including offline,
+and use **Export JSON** to download the original recording. Other output extensions
+continue to produce JSON.
+
 ### Profiling builds with async-profiler
 
 Enable profiling with `--with-profiler true` (or `-p true`):
