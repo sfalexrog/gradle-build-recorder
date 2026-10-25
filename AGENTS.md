@@ -22,10 +22,10 @@ Avoid common Gradle pitfalls. The project should be compatible with Gradle's con
 
 ## Sharing data schemas
 
-The project uses kotlinx.serialization to produce serialized recordings. These recordings will then be loaded by a web app. The schemas should be shared between the recorder and the web app, and should be produced automatically by running a Gradle task.
+The project uses `kotlinx.serialization` to produce serialized recordings. These recordings will then be loaded by a web app. The schemas should be shared between the recorder and the web app, and should be produced automatically by running a Gradle task.
 
 Produced schemas will be committed to the repository and therefore should be reproducible. A non-reproducible schema is considered a bug.
 
-Shared schemas are generated in the project `schema-generator`.
+Shared schemas are generated in the project `core`. The task to generate schemas is called `regenerateSchema`.
 
 The source of truth for generated schemas are files in the `core` project.

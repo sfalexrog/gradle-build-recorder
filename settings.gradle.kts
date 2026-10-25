@@ -29,3 +29,4 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 include(":gradle-build-recorder")
 include(":core")
+include(":web-viewer")
