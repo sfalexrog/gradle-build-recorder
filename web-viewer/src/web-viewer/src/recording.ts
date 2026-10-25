@@ -136,7 +136,9 @@ export function taskDependencies(groups: TaskGroup[], selected: Task | null) {
 }
 
 /** Assign overlapping tasks separate lanes while keeping each project in a single group. */
-export function groupTasks(tasks: Task[]) {
+export type ProjectOrder = 'name' | 'start-time'
+
+export function groupTasks(tasks: Task[], order: ProjectOrder = 'name') {
   const groups = new Map<string, Task[]>()
   for (const task of tasks) {
     const project = projectOf(task)
@@ -144,21 +146,31 @@ export function groupTasks(tasks: Task[]) {
     groups.get(project)!.push(task)
   }
   let top = 0
-  return [...groups]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, tasks]) => {
-      const bars = assignLanes(tasks, (task) => task.event).map(({ item: task, lane }) => ({
-        task,
-        lane,
+  return (
+    [...groups]
+      .map(([name, tasks]) => ({
+        name,
+        tasks,
+        start: tasks.reduce((first, task) => Math.min(first, task.event.startTime), Infinity),
       }))
-      const height = Math.max(
-        48,
-        bars.reduce((lanes, bar) => Math.max(lanes, bar.lane + 1), 0) * 22 + 18,
+      // Name is the stable tie-breaker when projects begin at the same instant.
+      .sort(
+        (a, b) => (order === 'start-time' ? a.start - b.start : 0) || a.name.localeCompare(b.name),
       )
-      const group = { name, tasks, bars, top, height }
-      top += height
-      return group
-    })
+      .map(({ name, tasks }) => {
+        const bars = assignLanes(tasks, (task) => task.event).map(({ item: task, lane }) => ({
+          task,
+          lane,
+        }))
+        const height = Math.max(
+          48,
+          bars.reduce((lanes, bar) => Math.max(lanes, bar.lane + 1), 0) * 22 + 18,
+        )
+        const group = { name, tasks, bars, top, height }
+        top += height
+        return group
+      })
+  )
 }
 export function clampView(view: Range, full: Range): Range {
   const span = Math.min(full.end - full.start, Math.max(1, view.end - view.start))

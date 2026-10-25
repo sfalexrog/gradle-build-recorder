@@ -110,6 +110,21 @@ describe('timeline math', () => {
       end: 500,
     })
   })
+  it('sorts projects by their earliest task, with name as a tie-breaker and updated row offsets', () => {
+    const tasks = [
+      task(':a:later', 300, 350),
+      task(':z:first', 50, 150),
+      task(':b:tie', 50, 100),
+      task(':a:first', 100, 200),
+    ]
+    expect(groupTasks(tasks).map((group) => group.name)).toEqual([':a', ':b', ':z'])
+    const groups = groupTasks(tasks, 'start-time')
+    expect(groups.map((group) => group.name)).toEqual([':b', ':z', ':a'])
+    expect(groups[0]!.top).toBe(0)
+    expect(groups[1]!.top).toBe(groups[0]!.height)
+    expect(groups[2]!.top).toBe(groups[0]!.height + groups[1]!.height)
+    expect(groupTasks([], 'start-time')).toEqual([])
+  })
   it('groups nested and root tasks and reuses nonoverlapping lanes', () => {
     expect(projectOf(task(':help'))).toBe(':')
     const groups = groupTasks([

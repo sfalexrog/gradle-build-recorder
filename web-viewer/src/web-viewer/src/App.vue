@@ -14,7 +14,7 @@ import {
   status,
   taskDependencies,
 } from './recording'
-import type { Download, GradleBuildRecord, Range, Task } from './recording'
+import type { Download, GradleBuildRecord, ProjectOrder, Range, Task } from './recording'
 import BuildTimeline from './components/timeline/BuildTimeline.vue'
 import DownloadInspector from './components/DownloadInspector.vue'
 
@@ -26,6 +26,7 @@ const error = ref('')
 const loading = ref(false)
 const absolute = ref(false)
 const mode = ref<'select' | 'pan'>('select')
+const projectOrder = ref<ProjectOrder>('name')
 const selectedProject = ref<string | null>(null)
 const selectedTask = shallowRef<Task | null>(null)
 const inspector = ref<'tasks' | 'downloads'>('tasks')
@@ -60,7 +61,9 @@ const stream = ref('all')
 const logLimit = ref(300)
 const full = computed(() => (recording.value ? bounds(recording.value) : { start: 0, end: 1 }))
 const span = computed(() => view.value.end - view.value.start)
-const groups = computed(() => groupTasks(recording.value?.taskExecutionEvents || []))
+const groups = computed(() =>
+  groupTasks(recording.value?.taskExecutionEvents || [], projectOrder.value),
+)
 const concurrency = computed(() =>
   parallelism(recording.value?.taskExecutionEvents || [], full.value),
 )
@@ -279,6 +282,10 @@ function fit() {
               <span class="muted">{{ groups.length }} projects</span>
             </div>
             <div class="controls">
+              <select v-model="projectOrder" aria-label="Project order">
+                <option value="name">Project name</option>
+                <option value="start-time">First task start</option>
+              </select>
               <select v-model="absolute" aria-label="Time display">
                 <option :value="false">Relative time</option>
                 <option :value="true">Local time</option></select

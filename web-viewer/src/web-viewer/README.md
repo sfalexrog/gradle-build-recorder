@@ -47,7 +47,8 @@ events and logs regardless of the current filters. Embedded recordings download 
 
 Open or drop a recorder JSON file. Projects have fixed left-aligned labels; hovering a
 row highlights its label. Click a project or a task bar to inspect the project's tasks
-on the right. Overlapping tasks occupy separate lanes. Bar tooltips include the task
+on the right. Use **Project name** / **First task start** to choose alphabetical or
+earliest-task ordering; ties use project name. Overlapping tasks occupy separate lanes. Bar tooltips include the task
 path, elapsed duration, and outcome. Cached, up-to-date, skipped, and failed tasks have
 distinct colors. Task durations show their full lifetime even when a range is selected.
 

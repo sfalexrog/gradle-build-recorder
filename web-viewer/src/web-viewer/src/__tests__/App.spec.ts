@@ -24,8 +24,8 @@ describe('viewer', () => {
 
   function captureDownload() {
     vi.useFakeTimers()
-    const createObjectURL = vi.fn((_blob: Blob) => 'blob:recording')
-    const revokeObjectURL = vi.fn()
+    const createObjectURL = vi.fn<(_blob: Blob) => string>(() => 'blob:recording')
+    const revokeObjectURL = vi.fn<() => void>()
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     return { createObjectURL, revokeObjectURL, click }
@@ -304,6 +304,27 @@ describe('viewer', () => {
     await wrapper.get('.inspector-tabs button:first-child').trigger('click')
     expect(wrapper.findAll('.task-list article')).toHaveLength(1)
     wrapper.unmount()
+  })
+  it('switches project order without clearing task selection', async () => {
+    const record = structuredClone(fixture)
+    record.taskExecutionEvents[1]!.event.startTime = 50
+    const wrapper = await loaded(record)
+    await wrapper.findAll('.task-select')[0]!.trigger('click')
+    expect(wrapper.findAll('.project-labels button strong').map((label) => label.text())).toEqual([
+      ':app',
+      ':lib',
+    ])
+    await wrapper.get('select[aria-label="Project order"]').setValue('start-time')
+    expect(wrapper.findAll('.project-labels button strong').map((label) => label.text())).toEqual([
+      ':lib',
+      ':app',
+    ])
+    expect(wrapper.get('.dependency-summary strong').text()).toBe(':lib:test')
+    await wrapper.get('select[aria-label="Project order"]').setValue('name')
+    expect(wrapper.findAll('.project-labels button strong').map((label) => label.text())).toEqual([
+      ':app',
+      ':lib',
+    ])
   })
   it('keeps a loaded recording when the next file is invalid', async () => {
     const wrapper = await loaded()
